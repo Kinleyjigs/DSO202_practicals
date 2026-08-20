@@ -9,7 +9,9 @@ The practical also introduced the use of kubectl, which is the command-line tool
 
 The practical covered Kubernetes architecture, Pods, ReplicaSets, Deployments, Services, namespaces, resource management, and troubleshooting. The practical addresses LO1, LO2, LO3 and part of LO5.
 
-# Stage 1 - Creating the Three-Node Cluster
+# Procedure and Observations 
+## Stage 1 - Creating the Three-Node Cluster
+
 
 ```bash
 kind create cluster --config cluster/kind-cluster.yaml
@@ -23,17 +25,13 @@ Confirm kind considers the cluster to exist, and list the Docker containers behi
 
 Confirm the same three nodes as Docker containers.
 
-```bash
-docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
-```
-
 ![image.png](assets/image%202.png)
 
 Confirm that kubectl is pointing at the new cluster. kind adds a context named `kind-<cluster-name>` and selects it automatically.
 
 ![image.png](assets/image%203.png)
 
-# Stage 2 - Inspecting the Cluster and Its Components
+## Stage 2 - Inspecting the Cluster and Its Components
 
 Ask the cluster where its control plane is.
 
@@ -71,7 +69,7 @@ List every kind of object the cluster knows about, and note which are namespaced
 
 ![image.png](assets/image%2012.png)
 
-# Stage 3 - Namespaces, Resource Quotas, and Limit Ranges
+## Stage 3 - Namespaces, Resource Quotas, and Limit Ranges
 
 Apply the namespace
 
@@ -99,7 +97,7 @@ kubectl get resourcequota,limitrange
 
 ![image.png](assets/image%2013.png)
 
-# Stage 4 - Pods
+## Stage 4 - Pods
 
 A **Pod** is the smallest deployable unit in Kubernetes — one or more containers that share a network and storage. A Pod created directly (like we're about to do) has **no controller** watching it if it dies, nothing brings it back. That's the whole reason Deployments exist (Stage 5), but you need to see a bare Pod first to understand what a Deployment is actually managing underneath.
 
@@ -241,7 +239,7 @@ Use `kubectl explain` whenever a field is unfamiliar. It reads the schema from t
 
 ![image.png](assets/image%2026.png)
 
-# Stage 5 - Deployments
+## Stage 5 - Deployments
 
 **ReplicaSet.** A controller object holding a Pod template, a replica count, and a label selector. Its control loop counts the Pods matching its selector, creates more if there are too few, and deletes some if there are too many. ReplicaSets are rarely written by hand.
 
@@ -389,7 +387,7 @@ Restore the declared state, so that the repository and the cluster agree again.
 
 ![image.png](assets/image%2042.png)
 
-# Stage 6 - Services
+## Stage 6 - Services
 
 **Service.** An object that defines a stable virtual IP address and DNS name, together with a label selector. Traffic sent to the Service is load-balanced across the Pods that both match the selector and are currently ready.
 
@@ -455,7 +453,7 @@ kubectl delete service lb-demo
 
 ![image.png](assets/image%2050.png)
 
-# Stage 7 — Cleanup
+## Stage 7 — Cleanup
 
 A kind cluster holds several gigabytes of disk and continues consuming memory until it is deleted. Reproducibility is also part of the assessment: a cluster that can be destroyed and rebuilt from `cluster/kind-cluster.yaml` and `manifests/` proves that the repository, and not the laptop, holds the work.
 
@@ -472,7 +470,6 @@ kubectl delete -f <filename>
 
 ## Confirm the namespace is empty apart from the quota and limit range
 kubectl get all
-
 ```
 
 ![image.png](assets/image%2052.png)
@@ -494,3 +491,15 @@ kind get clusters
 
 ![image.png](assets/image%2054.png)
 
+# Conclusion
+This practical successfully introduced the basic concepts and operations of Kubernetes.
+
+I created a three-node Kubernetes cluster using kind and inspected the control-plane and worker-node components. I then created a namespace and configured ResourceQuota and LimitRange to control resource usage.
+
+I learned how to create Pods using both imperative and declarative methods and used labels, annotations and selectors to manage Kubernetes objects. I also used kubectl logs, kubectl exec, kubectl port-forward and kubectl explain for troubleshooting and inspection.
+
+The Deployment section demonstrated ReplicaSets, self-healing, scaling, rolling updates, rollback and failure handling. Finally, the Service section demonstrated ClusterIP, NodePort and LoadBalancer behaviour.
+
+The most important concept learned from this practical was that Kubernetes works by maintaining a desired state. Controllers continuously work to make the actual cluster state match that desired state. This explains features such as self-healing, scaling, rolling updates and service management.
+
+The practical was completed successfully, and the cluster was cleaned up at the end. The manifests can be used to recreate the environment, demonstrating that the practical is reproducible.
