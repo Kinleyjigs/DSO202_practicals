@@ -1,13 +1,9 @@
 # Practical 1
 
 ## Objective 
-The main objective of this practical was to understand the basic working of Kubernetes by creating and managing a local Kubernetes cluster using kind (Kubernetes IN Docker). The practical used a small Nginx web server so that the focus could remain on Kubernetes objects and not on application development.
+This practical involved setting up a three-node Kubernetes cluster using kind and exploring key Kubernetes objects: Namespaces, Pods, Deployments, and Services using Nginx as the test workload.
 
-During the practical, I created a three-node Kubernetes cluster consisting of one control-plane node and two worker nodes. I then inspected the cluster components, created a namespace, configured resource quotas and limits, created Pods, created a Deployment, tested self-healing and scaling, performed rolling updates and rollbacks, and finally exposed the application using Kubernetes Services.
-
-The practical also introduced the use of kubectl, which is the command-line tool used to communicate with and manage a Kubernetes cluster.
-
-The practical covered Kubernetes architecture, Pods, ReplicaSets, Deployments, Services, namespaces, resource management, and troubleshooting. The practical addresses LO1, LO2, LO3 and part of LO5.
+The practical covered inspecting cluster components, applying resource limits, creating Pods, and using Deployments for self-healing, scaling, rolling updates, and rollback. ClusterIP and NodePort Services were also used to expose the application, while LoadBalancer limitations in kind were observed. All cluster operations were performed using kubectl.
 
 # Procedure and Observations 
 ## Stage 1 - Creating the Three-Node Cluster
@@ -19,55 +15,49 @@ kind create cluster --config cluster/kind-cluster.yaml
 
 ![alt text](assets/image.png)
 
-Confirm kind considers the cluster to exist, and list the Docker containers behind it.
 
 ![image.png](assets/image%201.png)
-
-Confirm the same three nodes as Docker containers.
+The cluster came up successfully, pulling the image and starting the control plane, CNI, and StorageClass before joining the two worker nodes.
 
 ![image.png](assets/image%202.png)
-
-Confirm that kubectl is pointing at the new cluster. kind adds a context named `kind-<cluster-name>` and selects it automatically.
+`docker ps` confirms the three Kubernetes nodes are really just three Docker containers — dso202-control-plane, dso202-worker, and dso202-worker2 — all reported as running.
 
 ![image.png](assets/image%203.png)
 
+`kubectl config current-context` returns kind-dso202, confirming kind automatically pointed my kubeconfig at the new cluster without any manual switching.
+
 ## Stage 2 - Inspecting the Cluster and Its Components
 
-Ask the cluster where its control plane is.
-
 ![image.png](assets/image%204.png)
-
-List the nodes. The renamed Node objects appear here
+`kubectl cluster-info` shows where the API server is actually listening.
 
 ![image.png](assets/image%205.png)
-
-Add columns to the same query. `-o wide` is the fastest way to get more detail without switching to full YAML output.
+`kubectl get nodes` lists the three nodes under the names set by the kind config (control-plane, worker-node-1, worker-node-2) rather than the Docker container names
 
 ![image.png](assets/image%206.png)
-
-Read one node in detail and locate the labels applied by Listing 1.
+Adding `-o wide` surfaces the internal IPs and container runtime (containerd) without needing to switch to full YAML output.
 
 ![image.png](assets/image%207.png)
+`kubectl describe node worker-node-1` shows the full picture: labels, capacity/allocatable resources, and any Pods currently placed on the node.
 
-To retrieve only the labels, use a JSONPath expression rather than reading the whole description
 
 ![image.png](assets/image%208.png)
-
-List the namespaces that exist before any work is done.
+Rather than scrolling through the full describe output, a JSONPath query pulls just the labels directly.
 
 ![image.png](assets/image%209.png)
+Before creating anything of my own, kubectl get namespaces shows the five namespaces kind and Kubernetes create by default:  default, kube-system, kube-public, kube-node-lease, and local-path-storage.
 
-List the control-plane components. They run as Pods in `kube-system`
 
 ![image.png](assets/image%2010.png)
-
-Read the log of one control-plane component. This is the same mechanism used for application logs in Stage 4.
+The control-plane components (etcd, kube-apiserver, kube-controller-manager, kube-scheduler) all run as ordinary Pods in kube-system, alongside kube-proxy and kindnet, which each appear once per node.
 
 ![image.png](assets/image%2011.png)
-
-List every kind of object the cluster knows about, and note which are namespaced.
+kubectl logs isn't just for application containers. 
+the same command reads the logs of any control-plane Pod, which is useful when something in the cluster itself misbehaves.
 
 ![image.png](assets/image%2012.png)
+kubectl api-resources lists every object kind the cluster understands, split by whether it's namespaced or cluster-scoped.
+
 
 ## Stage 3 - Namespaces, Resource Quotas, and Limit Ranges
 
@@ -96,10 +86,16 @@ kubectl get resourcequota,limitrange
 ```
 
 ![image.png](assets/image%2013.png)
+The quota already shows count/configmaps: 1/10 before I created anything myself. every namespace gets a kube-root-ca.crt ConfigMap automatically, so the quota's "Used" column counts objects the cluster created too, not just mine.
 
 ## Stage 4 - Pods
 
-A **Pod** is the smallest deployable unit in Kubernetes — one or more containers that share a network and storage. A Pod created directly (like we're about to do) has **no controller** watching it if it dies, nothing brings it back. That's the whole reason Deployments exist (Stage 5), but you need to see a bare Pod first to understand what a Deployment is actually managing underneath.
+A **Pod** is the smallest deployable unit in Kubernetes.
+
+A pod can have multiple container which mainly shares:
+
+- networking 
+- storage  
 
 ### The imperative route
 
@@ -322,11 +318,10 @@ kubectl get deployment web-deployment
 
 ### Rolling update and rollback
 
-Watch the rollout in a second terminal.
+Watching the rollout in a second terminal, before triggering it.
 
 ![image.png](assets/image%2035.png)
-
-In the first terminal, change the image version. `nginx:1.31-alpine` is the current mainline release; `nginx:1.30-alpine` is the stable release used so far.
+Updating the image triggers a rolling update, with the change-cause annotation recording why the change was made:
 
 ```bash
 kubectl set image deployment/web-deployment web=nginx:1.31-alpine
@@ -389,15 +384,7 @@ Restore the declared state, so that the repository and the cluster agree again.
 
 ## Stage 6 - Services
 
-**Service.** An object that defines a stable virtual IP address and DNS name, together with a label selector. Traffic sent to the Service is load-balanced across the Pods that both match the selector and are currently ready.
-
-**How it works.** The EndpointSlice controller in `kube-controller-manager` watches Services and Pods. For each Service with a selector, it maintains one or more EndpointSlice objects listing the addresses of the matching **ready** Pods. `kube-proxy` on every node watches those EndpointSlices and programs the node's packet-forwarding rules so that packets addressed to the Service IP are rewritten to one of the listed Pod addresses. CoreDNS also watches Services and answers DNS queries for their names.
-
-**What a Service does not do.** It does not proxy at the application layer, does not terminate TLS, does not route on HTTP paths or hostnames, and does not perform retries.
-
-**Step 1.** Copy **Listing 6** into `manifests/04-service-clusterip.yaml` and apply it.
-
-Read the EndpointSlice the controller generated. This is the list of addresses the Service will actually send traffic to.
+A **Service** gives a stable virtual IP and DNS name that stays constant even as the Pods behind it come and go. Under the hood, the EndpointSlice controller tracks which Pods currently match the Service's selector and are ready, kube-proxy uses that list to forward traffic on every node, and CoreDNS answers name lookups for the Service. A Service does not do application-layer routing, TLS termination, or retries, that's what an Ingress is for.
 
 ```bash
 kubectl apply -f manifests/04-service-clusterip.yaml
@@ -409,10 +396,7 @@ kubectl get endpointslice -l kubernetes.io/service-name=web-clusterip
 
 ![image.png](assets/image%2044.png)
 
-Copy **Listing 8** into `manifests/06-pod-client.yaml` and apply it. This Pod exists only to issue requests from inside the cluster.
-Resolve the Service name from inside the cluster.
-
-Send requests through the Service.
+Applying a client Pod (manifests/06-pod-client.yaml) that exists purely to test the Service from inside the cluster, then resolving the Service name and requesting through it:
 
 ```bash
 kubectl wait --for=condition=Ready pod/client-pod --timeout=60s
@@ -426,18 +410,18 @@ kubectl exec client-pod -- wget -qO- http://web-clusterip | head -4
 ![image.png](assets/image%2046.png)
 
 ### NodePort
+Applying the NodePort Service, which fixes `nodePort: 30080`
+the same host port published by the kind cluster config:
 
-Copy **Listing 7** into `manifests/05-service-nodeport.yaml` and apply it. It fixes `nodePort: 30080`, which is the port Listing 1 published from the control-plane container to the host.
-
-Reach the application from the host machine, outside the cluster, with no port-forward running
+Reaching the application from the host machine directly, with no `port-forward` running:
 
 ![image.png](assets/image%2047.png)
 
 ![image.png](assets/image%2048.png)
 
-Repeat the command several times and observe different Pod names. The request path is: host port 30080, into the control-plane container's port 30080, to `kube-proxy` on that node, across the Pod network to a ready Pod on a worker node.
+Repeated requests return different Pod names, confirming the load-balancing across replicas.
 
- Confirm that the node port is open on every node, not only the one published to the host.
+Confirming the node port is open on every node, not just the one exposed to the host:
 
 ```bash
 docker exec dso202-worker curl -s http://localhost:30080
@@ -445,25 +429,25 @@ docker exec dso202-worker curl -s http://localhost:30080
 
 ![image.png](assets/image%2049.png)
 
-Confirm that a `LoadBalancer` Service cannot complete in kind, so that the behaviour is recognised rather than mistaken for a fault.
+Finally, creating a LoadBalancer Service to confirm it never leaves <pending> on kind, since there's no cloud provider to fulfil the request, this is expected behaviour.
 
+```
 kubectl create service loadbalancer lb-demo --tcp=80:80
 kubectl get service lb-demo
 kubectl delete service lb-demo
+```
 
 ![image.png](assets/image%2050.png)
 
-## Stage 7 — Cleanup
+## Stage 7 - Cleanup
 
-A kind cluster holds several gigabytes of disk and continues consuming memory until it is deleted. Reproducibility is also part of the assessment: a cluster that can be destroyed and rebuilt from `cluster/kind-cluster.yaml` and `manifests/` proves that the repository, and not the laptop, holds the work.
+A kind cluster keeps consuming memory and disk until it's deleted, so this stage removes the workload and the cluster itself and, by rebuilding everything from the manifests in one command, proves the whole setup is reproducible from the repository alone rather than depending on anything specific to this laptop.
 
 Capture final evidence before deleting anything.
 
 ![image.png](assets/image%2051.png)
 
-Note that `kubectl get all` is misleadingly named: it lists common workload and Service objects only, and omits ResourceQuotas, LimitRanges, ConfigMaps, Secrets, and every custom resource. The second command above compensates for part of that.
-
-Delete the workload objects declaratively, in reverse order of creation. Deleting from the same files that created the objects is the check that no object was created outside version control.
+Deleting the workload objects declaratively, from the same manifest files that created them, then confirming the namespace is clear of everything but the quota and limit range:
 
 ```bash
 kubectl delete -f <filename>
@@ -474,32 +458,24 @@ kubectl get all
 
 ![image.png](assets/image%2052.png)
 
-Rebuild everything from the repository in one command, to prove reproducibility. `kubectl apply -f` accepts a directory and applies the files in lexical order, which is exactly why the filenames are numbered.
+Rebuilding everything from the repository in a single command, since `kubectl apply -f manifests/` applies files in lexical order, which is exactly why they're numbered:
 
 ![image.png](assets/image%2053.png)
 
+Resetting the default namespace and deleting the cluster entirely:
+
 ```bash
-#Reset your default namespace back to normal
 kubectl config set-context --current --namespace=default
-
-#Delete the whole cluster
 kind delete cluster --name dso202
-
-#Confirm it's gone
 kind get clusters
 ```
 
 ![image.png](assets/image%2054.png)
 
-# Conclusion
-This practical successfully introduced the basic concepts and operations of Kubernetes.
+`kind get clusters` reports none remaining, and docker ps shows no kindest/node containers left running.
 
-I created a three-node Kubernetes cluster using kind and inspected the control-plane and worker-node components. I then created a namespace and configured ResourceQuota and LimitRange to control resource usage.
+# Reflection
+From this practical i learned that K8s is built around reconciling actual state with desired state. controllers continuously push the cluster toward whatever was declared, which is what makes self-healing, scaling, rolling updates, and Service routing all work the same underlying way.
 
-I learned how to create Pods using both imperative and declarative methods and used labels, annotations and selectors to manage Kubernetes objects. I also used kubectl logs, kubectl exec, kubectl port-forward and kubectl explain for troubleshooting and inspection.
+In this practical I built a three-node cluster, applied namespace-level quotas and limits, created Pods both imperatively and declaratively, and used a Deployment to exercise self-healing, scaling, rolling updates, rollback, and failure recovery, then exposed the result through ClusterIP and NodePort Services. The cluster was torn down at the end, and rebuilding it from the repository's manifests alone confirmed the whole setup is reproducible.
 
-The Deployment section demonstrated ReplicaSets, self-healing, scaling, rolling updates, rollback and failure handling. Finally, the Service section demonstrated ClusterIP, NodePort and LoadBalancer behaviour.
-
-The most important concept learned from this practical was that Kubernetes works by maintaining a desired state. Controllers continuously work to make the actual cluster state match that desired state. This explains features such as self-healing, scaling, rolling updates and service management.
-
-The practical was completed successfully, and the cluster was cleaned up at the end. The manifests can be used to recreate the environment, demonstrating that the practical is reproducible.
