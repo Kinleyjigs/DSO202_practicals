@@ -474,8 +474,14 @@ kind get clusters
 
 `kind get clusters` reports none remaining, and docker ps shows no kindest/node containers left running.
 
-# Reflection
+# Analysis
 From this practical i learned that K8s is built around reconciling actual state with desired state. controllers continuously push the cluster toward whatever was declared, which is what makes self-healing, scaling, rolling updates, and Service routing all work the same underlying way.
 
 In this practical I built a three-node cluster, applied namespace-level quotas and limits, created Pods both imperatively and declaratively, and used a Deployment to exercise self-healing, scaling, rolling updates, rollback, and failure recovery, then exposed the result through ClusterIP and NodePort Services. The cluster was torn down at the end, and rebuilding it from the repository's manifests alone confirmed the whole setup is reproducible.
 
+# Reflection
+The stage I found most challenging was Stage 5, especially the rolling update part. I ran into an error there when I deliberately set the Deployment's image to a tag that doesn't exist, just to see what would happen. The rollout got stuck, and one Pod stayed in ImagePullBackOff while the other three kept running fine. I used kubectl describe pod on the stuck one, and the Events: section told me straight away that the image couldn't be pulled. To fix it, I ran kubectl rollout undo, which brought the Deployment back to the last working version.
+
+Doing this practical also helped me understand why K8s keeps the old ReplicaSet around after an update instead of deleting it, it's there so a rollback is quick and doesn't need a fresh image pull.
+
+One thing I am still not fully clear on is why the namespaces don't isolate network traffic by default, a Pod in one namespace can still reach a Pod in another unless a NetworkPolicy blocks it, which felt like the opposite of what I expected a namespace to do.
