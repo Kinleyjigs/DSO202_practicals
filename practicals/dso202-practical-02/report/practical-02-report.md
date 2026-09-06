@@ -228,7 +228,6 @@ The two PVs were Released because their PVCs had been deleted while the PVs had 
 To return the storage to service, an administrator must deliberately clean/recover the storage and recreate or reset the PV, depending on the storage backend. Simply deleting the PV object does not delete the actual data
 
 ## Reflection
-### Reflection
 
 The most difficult part of this practical was understanding the difference between PVs, PVCs, StorageClasses, and StatefulSets. I also found it confusing when a PVC stayed in `Pending` and how `WaitForFirstConsumer` works.
 
