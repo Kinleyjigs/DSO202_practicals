@@ -32,42 +32,41 @@ I have used Postman to hit the backend directly through a port-forwarded connect
 firstly started port-forwarding the backend to localhost so Postman can reach it.
 ![alt text](evidence/15.png)
 
-
 ##### Create (POST)
 I sent a POST request to create a new task. The response returned the task with a generated `id`. 
-![alt text](/evidence/16.png)
+![alt text](evidence/16.png)
 
 ##### List (GET)
 Then i fetched all tasks. the newly created task appears in the list
-![alt text](/evidence/17.png)
+![alt text](evidence/17.png)
 
 ##### Update (PUT)
 I updated the task's status to `done` using its `id` the response confirms the change.
-![alt text](/evidence/18.png)
+![alt text](evidence/18.png)
 
 ##### Delete (DELETE)
 Then I deleted the task by `id` 
-![alt text](/evidence/19.png)
+![alt text](evidence/19.png)
 
 #### 7B: Service DNS resolution 
 
-![alt text](/evidence/13.png)
+![alt text](evidence/13.png)
 
 Ran curl from inside the frontend Pod, targeting the backend by its Service name (`backend-svc`) instead of an IP. It resolved to `10.96.84.16` and returned `200 OK` with `{"status":"ok","db":"connected"}` 
 which proof that Kubernetes' internal DNS is correctly routing requests to the backend Pod purely from the Service name.
 
 #### 7C: Self-healing and data persistence
 Manually deleted the running backend Pod to trigger self-healing.
-![alt text](/evidence/20.png)
+![alt text](evidence/20.png)
 
 Watched the Pods live during recreation:
-![alt text](/evidence/21.png)
+![alt text](evidence/21.png)
 
 **observation:**
 After deleting the Pod, the old one (`w4snb`) terminated, and a completely new Pod (`zn65v` different name) was created automatically by the Deployment controller, reaching `Running` within seconds with no manual action taken. This confirms Kubernetes' self-healing behaviour.
 
 To confirm data persistence, I fetched a task (id 2) that had been created earlier, through the newly recreated backend Pod:
-![alt text](/evidence/22.png)
+![alt text](evidence/22.png)
 
 **Observation:**
 The task was still present with its original data intact, even though the backend Pod serving it was brand new. This confirms the database's data persisted on a PersistentVolumeClaim is completely independent of the backend Pod's own lifecycle.
@@ -77,7 +76,7 @@ The task was still present with its original data intact, even though the backen
 
 **Declarative:** created via `kubectl apply -f frontend/service.yaml`:
 
-![alt text](/evidence/23.png)
+![alt text](evidence/23.png)
 
 **Imperative:** created via `kubectl expose`:
 ![alt text](evidence/24.png)
