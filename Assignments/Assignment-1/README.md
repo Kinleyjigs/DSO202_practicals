@@ -80,7 +80,7 @@ The task was still present with its original data intact, even though the backen
 ![alt text](/evidence/23.png)
 
 **Imperative:** created via `kubectl expose`:
-![alt text](/evidence/24.png)
+![alt text](evidence/24.png)
 
 | Method | NodePort | Speed | Configuration | Repeatability | Best Use |
 |---|---:|---|---|---|---|
@@ -88,3 +88,29 @@ The task was still present with its original data intact, even though the backen
 | Imperative (`kubectl expose`) | 31225 | Quick | Created directly by command | Less predictable | Quick testing |
 
 
+### File Structure 
+```
+assignment-1/
+├── README.md
+├── namespace.yaml
+├── configmap.yaml
+├── secret.yaml
+├── quota.yaml
+├── database/
+│   ├── pvc.yaml
+│   ├── deployment.yaml
+│   └── service.yaml
+├── backend/
+│   ├── deployment.yaml
+│   └── service.yaml
+├── frontend/
+│   ├── deployment.yaml
+│   └── service.yaml
+├── evidence/
+│   ├── 1.png
+│   ├── 2.png
+│   ├── ...
+│   └── 24.png
+└── report/
+    └── assignment1_report.md
+```
