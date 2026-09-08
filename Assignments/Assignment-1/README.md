@@ -25,7 +25,7 @@ The ResourceQuota and LimitRange were applied to the dso202-assignment-01 namesp
 
 Justification for chosen values: pods: 6 was chosen so a rolling update (old Pod + new Pod briefly running together) won't hit the limit. The per-container defaults are kept small on purpose, since this app is a simple CRUD demo rather than a production workload, and the cluster only has 3 nodes to work with.
 
-### Task 7: Verification and Interactivity
+### Task 7 Verification and Interactivity
 #### 7A: Full CRUD cycle
 I have used Postman to hit the backend directly through a port-forwarded connection, since the browser UI can't resolve the cluster-internal `backend-svc` DNS name.
 
