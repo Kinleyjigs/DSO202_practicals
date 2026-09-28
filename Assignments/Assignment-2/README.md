@@ -80,16 +80,15 @@ The `/api/status` endpoint returned `{"status":"ok","db":"connected"}`, confirmi
 
 
 ## 4. Analysis
-The StatefulSet provided a stable identity for the database pod and persistent storage through the PVC. When db-0 was deleted, Kubernetes recreated the pod with the same identity and reattached the existing persistent volume.
+The StatefulSet gave the database pod a stable identity and enabled persistent storage with the PVC. The Kubernetes recreated the pod with the same identity after the deletion of db-0 and reattached the persistent volume.
 
 The backend was also successfully connected to the database, as shown by the /api/status response.
 
-Ingress was then configured to provide access to the application without directly exposing the backend service. Requests to / were routed to the frontend service, while requests to /api were routed to the backend service.
+Ingress was then configured to provide access to the application without directly exposing the backend service. Requests to  `/` were routed to the frontend service, while requests to `/api` were routed to the backend service.
 
 The successful /api/status response through Ingress also showed that the request reached the backend and that the backend could still communicate with the database.
 
 ## 5. Conclusion
+The StatefulSet and Ingress configurations were implemented and verified successfully. After restarting, the database preserved its identity and persistent storage and the backend established the connection with the database.
 
-The StatefulSet and Ingress configurations were successfully implemented and tested. The database maintained its stable identity and persistent storage after a restart, while the backend successfully connected to the database.
-
-The Ingress Controller also successfully routed requests to both the frontend and backend services. Overall, the tests confirmed that the main Kubernetes components implemented in this part of the assignment are working as expected.
+The Ingress Controller worked properly in routing the requests to both the frontend and backend services. To sum up, the operation of the critical components in Kubernetes used in this part of the work proved to be consistent with the expectations.
