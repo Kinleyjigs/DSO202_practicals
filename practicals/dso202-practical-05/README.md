@@ -73,6 +73,36 @@ The difference between dev and prod is explained by about 7 changed lines per re
 First inspect:
 ![alt text](assets/7.png)
 
+- Rendered the dev overlay without touching the cluster. The output shows the base resources transformed for dev: namespace webapp-dev, label environment: dev, 1 replica, image nginx:1.25-alpine, and the generated ConfigMap web-content-mk4d6g96k6 referenced by the Deployment.
+
 Then diff:
+![alt text](assets/8.png)
+
+The diff returned namespaces "webapp-dev" not found. This is expected on a first deployment, since the namespace doesn't exist yet and there is nothing to compare against. The diff is read-only, so it was safe to run.
+
+Then i applied the dev overlay. Kustomize created the Namespace, ConfigMap, Service and Deployment in one command.
+![alt text](assets/9.png)
+
+Then verify:
+![alt text](assets/10.png)
+- `kubectl get all -n webapp-dev`: Shows all dev resources running in the webapp-dev namespace, including the Pod, Service, Deployment, and ReplicaSet.
+
+- `kubectl get configmap -n webapp-dev` : Shows the generated ConfigMap containing the index.html content; the suffix changes based on its content. 
+
+- `kubectl rollout status deployment/webapp -n webapp-dev`: Confirms that the webapp Deployment rolled out successfully and the pod is serving.
+
+## Task 5: Reach the application
+Use port-forward:
+![alt text](assets/11.png)
+
+Forwarded local port 8080 to port 80 of the webapp Service in webapp-dev, so the ClusterIP service can be reached from my machine.
+
+![alt text](assets/12.png)
+Then the response reads "DEV v1 - development environment", which is the content from overlays/dev/index.html. This confirms the dev overlay's generated ConfigMap is mounted into the NGINX pod, not the base page.
+
+## Task 6: Prove the ConfigMap hash/rollout chain
+Capture the current generated ConfigMap:
+
+
 
 
