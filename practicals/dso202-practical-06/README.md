@@ -1,5 +1,4 @@
-# Practical 6 Helm: Release Lifecycle and Failure Handling
-
+# Practical 6 Helm
 ---
 
 ## Aim
