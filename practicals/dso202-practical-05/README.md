@@ -1,207 +1,111 @@
-# Practical 5: Environment-Specific Configuration with Kustomize on Kind
+# Practical 6 Helm: Release Lifecycle and Failure Handling
 
-## Objective
+---
 
-To use Kustomize to run one web application in dev, staging, prod and QA without copying the base manifests. I learned to:
+## Aim
 
-- render a base and overlays and read the output;
-- change namespace, labels, replicas and image tags per environment;
-- use generators and patches;
-- see how a ConfigMap hash triggers a rollout;
-- follow the safe workflow: **render → diff → apply → verify**.
+To package a web application as a Helm chart, deploy it to separate development and production environments, and practise upgrades, rollbacks and common release failures using Helm 4.
+
+## Objectives
+
+1. Build a Helm chart (`webapp`) with templates, default values, a values schema and a chart test.
+2. Deploy the same chart to two environments (dev and prod) using separate values files.
+3. Upgrade a release and observe how a configuration change triggers a rolling update.
+4. Recover from a failed upgrade automatically with `--rollback-on-failure`, and manually with `helm rollback`.
+5. Reproduce and fix four common failures: a NodePort clash, an ownership conflict, drift made outside Helm, and an immutable selector change.
 
 ## Environment
 
-| Item | Details |
+| Item | Version / Detail |
 |---|---|
-| Cluster | Kind, 1 control-plane + 2 workers (Kubernetes v1.36.1) |
-| kubectl | v1.36.3 (built-in Kustomize v5.8.1) |
-| Machine | macOS (arm64) with Docker |
-| App | NGINX serving a page from a generated ConfigMap |
+| Helm | v4.3.0 |
+| Kubernetes | v1.36.1 |
+| Cluster | kind cluster `dso202` (1 control-plane, 2 workers) |
+| Host | macOS, Docker Desktop |
 
-**Layout:** one `base/` (Deployment, Service, `index.html`) and one overlay each for dev, staging, prod, qa and sandbox.
+---
 
-## Procedure and Observations
-### Task 1: Read the repository before running it 
+#### File structure
 
-![alt text](assets/1.png)
+![file structure](assets/1.png)
 
-*The repository tree: one `base/` and an overlay folder per environment.*
+*Figure 1: Structure of the webapp chart and environment values files in dso202-practical-06.*
+
+### Step 1: Dev release
 
 ![alt text](assets/2.png)
 
-*The base and dev `kustomization.yaml` files.*
-
-1. Which files exist only once for all environments?
-
-**Ans:** Files that exist once for all environments are deployment.yaml, service.yaml, index.html and kustomization.yaml, all in base/.
-
-2. Which values differ between environments?
-
-**Ans:** The values that differ between environments are namespace, environment label, replica count, image tag, page content, and (prod only) resource limits and an annotation.
-
-3. Where are those differences represented?
-
-**Ans:** They are represented in each overlay's kustomization.yaml (namespace, labels, replicas, images, generator) plus its own index.html, namespace.yaml and patch file.
-
-### Task 2: Render the base 
+*Figure 2: Local render of the webapp chart with dev values, producing four objects (ConfigMap, Service, Deployment, test Pod) in Helm's install order, and helm lint plus helm template passing for both the dev and prod environments.*
 
 ![alt text](assets/3.png)
-*Rendering the base gives a ConfigMap, a Service and a Deployment.*
 
+*Figure 3: Installation of the webapp-dev release, the page reached on NodePort 30080 showing Environment: dev, and the chart test webapp-dev-test-connection completing with Phase: Succeeded.*
 
+### Step 2: Prod release
 
 ![alt text](assets/4.png)
-*The ConfigMap name has a hash, and the Deployment reference uses the same name.*
 
-from the above command we got:
+*Figure 4: The webapp-prod release running 3/3 replicas behind a ClusterIP Service, both releases listed by helm list -A, and the release history showing that running helm upgrade --install a second time created revision 2 without changing the deployed objects.*
 
-| Resource | Details |
-|---|---|
-| The Deployment | `kind: Deployment`, named `webapp` |
-| The Service | `kind: Service`, named `webapp` |
-| The generated ConfigMap | `kind: ConfigMap` with the content from `base/index.html` |
-| The hash suffix | `web-content-97bftm2bkd` |
-| The rewritten reference | Under `volumes:`, `configMap: name: web-content-97bftm2bkd` |
+### Step 3: Content-only upgrade (checksum rollout)
 
+![alt text](assets/5.png)
 
-Explain why the generated ConfigMap name does not exactly equal web-content?
+*Figure 5: The page message updated in dev.yaml and applied with helm upgrade. A new Pod with a different ReplicaSet hash replaced the old one because the checksum/config annotation changed, and the updated message is served on port 30080.*
 
-**Ans:** The generated ConfigMap name is `web-content-97bftm2bkd`, not `web-content`, because Kustomize's `configMapGenerator` appends a hash computed from the ConfigMap's contents. Kustomize also automatically rewrites the Deployment's `configMap.name` reference to the hashed name, so the two stay in sync. The hash exists so that a content change produces a new name, which changes the Deployment's pod template and forces a rolling update.
+### Step 4: Failed upgrade with automatic rollback
 
-### Task 3: Compare dev and prod without touching the cluster
-![render to files](assets/5.png)
-*Rendered dev and prod into temporary files.*
-
-![diff dev vs prod](assets/6.png)
-*The diff shows everything that differs between dev and prod.*
-
-| Category | dev | prod | Where it comes from |
-|---|---|---|---|
-| 1 | Namespace | `webapp-dev` | `webapp-prod` | `namespace:` in the overlay |
-| 2 | Environment label | `dev` | `prod` | `labels:` in the overlay |
-| 3 | Replicas | 1 | 3 | `replicas:` in the overlay |
-| 4 | Image tag | `nginx:1.25-alpine` | `nginx:1.27-alpine` | `images:` in the overlay |
-| 5 | Resources | 50m/32Mi req, 100m/64Mi lim | 200m/128Mi req, 500m/256Mi lim | `patch-resources.yaml` |
-| 6 | ConfigMap content and hash | `mk4d6g96k6` | `77497k9cfm` | `index.html` + generator |
-| 7 | Annotation | none | `training.example.com/tier: production` | `patch-resources.yaml` |
-
-The difference between dev and prod is explained by about 7 changed lines per resource, driven by a few lines in each overlay's kustomization.yaml. You don't have to read two full copies of the manifests, which is the overlay's value.
-
-### Task 4: Deploy dev safely
-First inspect:
+![alt text](assets/6.png)
 ![alt text](assets/7.png)
 
-- Rendered the dev overlay without touching the cluster. The output shows the base resources transformed for dev: namespace webapp-dev, label environment: dev, 1 replica, image nginx:1.25-alpine, and the generated ConfigMap web-content-mk4d6g96k6 referenced by the Deployment.
+*Figure 6: Upgrade with a fake image tag fails, so Helm automatically rolls back to the last working version (revision 3 failed, revision 4 restored it).*
 
-Then diff:
+### Step 5: Manual rollback
+
 ![alt text](assets/8.png)
 
-The diff returned namespaces "webapp-dev" not found. This is expected on a first deployment, since the namespace doesn't exist yet and there is nothing to compare against. The diff is read-only, so it was safe to run.
+*Figure 7: Manual rollback to revision 1, saved as a new revision 5 with the original message back.*
 
-Then i applied the dev overlay. Kustomize created the Namespace, ConfigMap, Service and Deployment in one command.
+### Step 6: NodePort clash
+
 ![alt text](assets/9.png)
 
-Then verify:
+*Figure 8: A second release cannot use NodePort 30080 because webapp-dev already holds it, so the install fails.*
+
+### Step 7: Helm won't take over objects it didn't create
+
 ![alt text](assets/10.png)
-- `kubectl get all -n webapp-dev`: Shows all dev resources running in the webapp-dev namespace, including the Pod, Service, Deployment, and ReplicaSet.
 
-- `kubectl get configmap -n webapp-dev` : Shows the generated ConfigMap containing the index.html content; the suffix changes based on its content. 
+*Figure 9: Helm refuses to take over a ConfigMap made by kubectl, then adopts it once --take-ownership is given.*
 
-- `kubectl rollout status deployment/webapp -n webapp-dev`: Confirms that the webapp Deployment rolled out successfully and the pod is serving.
+### Step 8: Catching changes made behind Helm's back
 
-### Task 5: Reach the application
-Use port-forward:
 ![alt text](assets/11.png)
 
-Forwarded local port 8080 to port 80 of the webapp Service in webapp-dev, so the ClusterIP service can be reached from my machine.
+*Figure 10: Replicas changed to 5 with kubectl, so Helm 4 stops the upgrade with a conflict instead of silently overwriting it.*
 
 ![alt text](assets/12.png)
-Then the response reads "DEV v1 - development environment", which is the content from overlays/dev/index.html. This confirms the dev overlay's generated ConfigMap is mounted into the NGINX pod, not the base page.
 
-### Task 6: Prove the ConfigMap hash/rollout chain
-![before](assets/13.png)
-*Before: ConfigMap `web-content-mk4d6g96k6` and pod `webapp-65ccf6845f-zhkrt`.*
+*Figure 11: With --force-conflicts, Helm takes ownership back and replicas return to 3.*
 
-![render again](assets/14.png)
-*After editing `index.html`, the render shows a new ConfigMap name.*
+This matches the module notes: the conflict is deliberate. Controllers such as the Horizontal Pod Autoscaler legitimately change `spec.replicas`, so Helm 4 makes the disagreement visible instead of letting two managers overwrite each other.
 
-![apply and after](assets/15.png)
-*After applying: new ConfigMap `web-content-t7t6bd6kb8` and new pod `webapp-6d7f88fdf6-rmcsm`.*
+### Step 9: Changing a selector label breaks the app
 
-| | Before | After |
-|---|---|---|
-| ConfigMap | `web-content-mk4d6g96k6` | `web-content-t7t6bd6kb8` |
-| Pod | `webapp-65ccf6845f-zhkrt` | `webapp-6d7f88fdf6-rmcsm` |
+![alt text](assets/13.png)
 
-The old ConfigMap is still there, because `kubectl apply` does not delete old generated ConfigMaps.
+*Figure 12: Adding a label to the selector makes the upgrade fail, and the Service loses its Pods, so the site goes down.*
 
+#### Undo the mistake and fix it
 
-The index.html changed:
-- generated ConfigMap content changed
-- ConfigMap name (hash) changed
-- Deployment reference changed
-- pod template changed
-- rollout: new ReplicaSet and new pod
+![alt text](assets/14.png)
 
-#### Explanation
-I only edited one file. Kustomize renamed the ConfigMap and updated the Deployment, and Kubernetes saw a changed pod template and rolled out a new pod. A plain ConfigMap edit would not have restarted anything.
+*Figure 13: After removing the bad label and upgrading again, the Service finds its Pods and the site is back.*
 
-
-
-
-### Task 7: Deploy staging and prod
-
-![alt text](assets/16.png)
-*All 6 pods are running, each environment in its own namespace.*
-
-| Environment | Replicas |
-|---|---|
-| dev | 1 |
-| staging | 2 |
-| prod | 3 |
-
-### Task 8: Inspect what the prod patch changed
-![alt text](assets/17.png)
-*The patch file and the rendered prod resources.*
-
-
-1. Were the base resource values deleted entirely or merged?
-
-**Ans:** The base resources were merged. The patch matches the base container by name: nginx and overrides only the CPU and memory values. The ports and volume mounts stayed, as the render shows.
-
-2. Which environment owns the production-specific resource policy?
-
-**Ans:** The prod overlay (overlays/prod/patch-resources.yaml), not the base.
-
-3. Why is a patch better than copying deployment.yaml into prod/?
-
-**Ans:** A copy duplicates the whole file, so later base changes would have to be repeated and could drift. A patch states only the difference and keeps inheriting everything else.
-
-### Task 9: QA overlay
-
-
-![QA files](assets/18.png)
-*The QA overlay reuses the base and adds only its own page, namespace and a JSON 6902 patch.*
-
-![QA apply](assets/19.png)
-*The annotation `training.example.com/owner: qa-team` showed in the render, then QA was applied and the live Deployment had it.*
-
-**Strategic merge vs JSON 6902**
-
-| | Strategic merge | JSON 6902 |
-|---|---|---|
-| What it is | A partial Kubernetes resource merged into the target | A list of operations (`add`, `replace`, `remove`) on exact paths |
-| Matching | Understands Kubernetes keys, e.g. container `name` | Path-based only, no Kubernetes awareness |
-| Used here | `prod/patch-resources.yaml` | `qa/
-
-
-### Task 10: Cleanup
-
-![alt text](assets/20.png)
-*Deleted all four environments. The final `grep` printed nothing, so no `webapp-*` namespaces are left.*
-
+---
 ## Reflection
-During this practical, I learned how Kustomize can manage different environments using one base and separate overlays. I also learned the importance of checking the rendered YAML before applying it, especially after facing errors in my YAML files. The most useful concept I learned was how changing the ConfigMap content creates a new hash and automatically triggers a new pod rollout. Overall, this practical helped me understand how Kustomize makes Kubernetes configuration more organized, reusable, and safer to manage.
 
+This practical helped me understand how Helm manages application releases, tracks changes, and rolls back failed upgrades. I learned that not all failed upgrades prevent downtime, as some changes can still affect the running application. I also gained experience troubleshooting issues with ports, cluster configuration, and Helm commands.
 
+---
+---

@@ -1,0 +1,13 @@
+# Chart.yaml - identity and metadata of the chart.
+apiVersion: v2
+name: webapp
+description: A static web page served by nginx, used in DSO202 Unit III 3.2
+type: application
+version: 0.1.0
+appVersion: "1.30-alpine"
+kubeVersion: ">=1.30.0-0"
+keywords:
+  - nginx
+  - dso202
+maintainers:
+  - name: DSO202 Module Team
