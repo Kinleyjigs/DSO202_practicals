@@ -2,13 +2,13 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: db
-  namespace: dso202-assignment-02
+  namespace: dso202-assignment-02-v2
   labels:
     tier: database
 spec:
-  serviceName: db-svc        
+  serviceName: db-svc              # Must be the headless Service above
   replicas: 1
-  podManagementPolicy: OrderedReady
+  podManagementPolicy: OrderedReady   # db-0 must be Ready before db-1 starts
   selector:
     matchLabels:
       tier: database
@@ -28,10 +28,22 @@ spec:
                 name: dso202-config
             - secretRef:
                 name: dso202-secret
+          readinessProbe:          # Pod only counts as Ready once Postgres accepts connections
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
-  volumeClaimTemplates:
+  volumeClaimTemplates:            # One PVC per replica: data-db-0, data-db-1, ...
     - metadata:
         name: data
       spec:
@@ -42,6 +54,8 @@ spec:
             storage: 1Gi
   updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+      partition: 0
   persistentVolumeClaimRetentionPolicy:
-    whenDeleted: Retain
-    whenScaled: Retain
+    whenDeleted: Retain            # Keep data if the StatefulSet is deleted
+    whenScaled: Retain             # Keep data if replicas are scaled down

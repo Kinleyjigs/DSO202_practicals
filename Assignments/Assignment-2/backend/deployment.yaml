@@ -2,11 +2,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend-deployment
-  namespace: dso202-assignment-02
+  namespace: dso202-assignment-02-v2
   labels:
     tier: backend
 spec:
-  replicas: 1
+  replicas: 2                      # Stateless, so replicas are interchangeable
   selector:
     matchLabels:
       tier: backend
@@ -56,3 +56,16 @@ spec:
                 secretKeyRef:
                   name: dso202-secret
                   key: DB_PASSWORD
+          readinessProbe:          # Ingress only sends traffic to Pods that pass this
+            httpGet:
+              path: /api/status
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

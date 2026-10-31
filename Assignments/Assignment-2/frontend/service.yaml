@@ -2,14 +2,13 @@ apiVersion: v1
 kind: Service
 metadata:
   name: frontend-svc
-  namespace: dso202-assignment-02
+  namespace: dso202-assignment-02-v2
   labels:
     tier: frontend
 spec:
-  type: NodePort
+  type: ClusterIP                  # No NodePort any more: the Ingress is the only way in
   selector:
     tier: frontend
   ports:
     - port: 8080
       targetPort: 8080
-      nodePort: 30082

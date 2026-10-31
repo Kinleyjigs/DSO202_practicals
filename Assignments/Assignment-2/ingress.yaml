@@ -2,25 +2,25 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: task-tracker-ingress
-  namespace: dso202-assignment-02
+  namespace: dso202-assignment-02-v2
+  # No rewrite-target annotation: the backend expects the full /api/... path.
 spec:
-  ingressClassName: nginx
+  ingressClassName: nginx          # Selects the NGINX Ingress Controller
   rules:
-    - http:
+    - host: tasktracker.localhost  # Name-based virtual host (*.localhost resolves to 127.0.0.1)
+      http:
         paths:
-          - path: /api
+          - path: /api             # /api, /api/status, /api/tasks/1 -> backend
             pathType: Prefix
             backend:
               service:
                 name: backend-svc
                 port:
                   number: 8080
-
-          - path: /
+          - path: /                # everything else -> frontend
             pathType: Prefix
             backend:
               service:
                 name: frontend-svc
                 port:
                   number: 8080
-                  
