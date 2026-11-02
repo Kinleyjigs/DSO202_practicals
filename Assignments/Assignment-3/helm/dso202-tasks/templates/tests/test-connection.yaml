@@ -1,0 +1,21 @@
+# Run with: helm test <release> -n <namespace>
+# Passes only if the backend answers /api/status and reports the database as connected.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "dso202.fullname" . }}-test-connection
+  labels:
+    {{- include "dso202.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  restartPolicy: Never
+  containers:
+    - name: check-backend
+      # Reuses the frontend image (Alpine, ships wget), so no extra image pull.
+      image: {{ include "dso202.image" (dict "root" . "name" .Values.frontend.image) }}
+      imagePullPolicy: {{ .Values.image.pullPolicy }}
+      command: ["sh", "-c"]
+      args:
+        - wget -qO- http://{{ include "dso202.backendName" . }}:{{ .Values.backend.port }}/api/status | grep '"db":"connected"'

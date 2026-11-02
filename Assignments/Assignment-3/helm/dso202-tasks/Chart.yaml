@@ -1,0 +1,7 @@
+apiVersion: v2
+name: dso202-tasks
+description: Assignment 1's three-tier Task Tracker (PostgreSQL, Node backend, nginx frontend) packaged as a Helm chart
+type: application
+# version = the chart (packaging) version; appVersion = the application images it deploys.
+version: 0.1.0
+appVersion: "1.0"

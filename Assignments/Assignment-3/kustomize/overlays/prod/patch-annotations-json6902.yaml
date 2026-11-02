@@ -1,0 +1,11 @@
+# JSON 6902 patch. The annotation key "dso202.example.com/owner" contains "/",
+# which must be written as "~1" inside a JSON Pointer path.
+- op: add
+  path: /metadata/annotations
+  value: {}
+- op: add
+  path: /metadata/annotations/dso202.example.com~1owner
+  value: platform-team
+- op: add
+  path: /spec/revisionHistoryLimit
+  value: 5

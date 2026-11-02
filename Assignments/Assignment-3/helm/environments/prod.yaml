@@ -1,0 +1,39 @@
+# helm upgrade --install tasks ./dso202-tasks -n dso202-a3-helm-prod --create-namespace -f environments/prod.yaml
+environment: prod
+
+image:
+  tag: "1.0"
+
+credentials:
+  password: Prod-ChangeMe456!
+
+backend:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 150m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+frontend:
+  replicaCount: 2
+  service:
+    nodePort: 30085
+  backendUrl: http://localhost:8083
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+quota:
+  hard:
+    pods: "10"
+    requests.cpu: "1500m"
+    requests.memory: 1Gi
+    limits.cpu: "3"
+    limits.memory: 2Gi

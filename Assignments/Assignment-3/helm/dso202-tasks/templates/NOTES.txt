@@ -1,0 +1,15 @@
+{{ .Chart.Name }} {{ .Chart.AppVersion }} is deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}" ({{ .Values.environment }}).
+
+1. Watch the Pods become Ready:
+   kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+2. Check the backend and its database connection:
+   helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+3. Open the app (run each port-forward in its own terminal):
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "dso202.backendName" . }} {{ trimPrefix "http://localhost:" .Values.frontend.backendUrl | default "8081" }}:{{ .Values.backend.port }}
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "dso202.frontendName" . }} <local-port>:{{ .Values.frontend.port }}
+   The browser calls the backend at: {{ .Values.frontend.backendUrl | default "(in-cluster only)" }}
+{{- if .Values.frontend.service.nodePort }}
+   Frontend NodePort: {{ .Values.frontend.service.nodePort }}
+{{- end }}

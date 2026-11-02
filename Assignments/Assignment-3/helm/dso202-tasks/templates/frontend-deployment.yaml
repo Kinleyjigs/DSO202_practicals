@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dso202.frontendName" . }}
+  labels:
+    {{- include "dso202.labels" . | nindent 4 }}
+    tier: frontend
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "dso202.selectorLabels" (dict "root" . "tier" "frontend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "dso202.labels" . | nindent 8 }}
+        tier: frontend
+      annotations:
+        {{- include "dso202.checksums" . | nindent 8 }}
+    spec:
+      containers:
+        - name: frontend
+          image: {{ include "dso202.image" (dict "root" . "name" .Values.frontend.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.frontend.port }}
+          env:
+            - name: BACKEND_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "dso202.configName" . }}
+                  key: BACKEND_URL
+          {{- with .Values.frontend.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

@@ -1,0 +1,8 @@
+# Prod runs 5 Pods (1 db + 2 backend + 2 frontend); leave room for rolling updates.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: dso202-quota
+spec:
+  hard:
+    pods: "10"

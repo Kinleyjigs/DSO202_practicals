@@ -1,0 +1,67 @@
+# Default values for dso202-tasks. Environment files in ../environments/ override these.
+
+environment: dev
+
+image:
+  repository: sarojsanyasi
+  # Empty tag means "use the chart's appVersion".
+  tag: ""
+  pullPolicy: IfNotPresent
+
+credentials:
+  username: taskuser
+  # No default on purpose: the chart fails to render until a password is supplied.
+  password: ""
+
+database:
+  image: dso202-db
+  name: tasksdb
+  port: 5432
+  storage:
+    size: 1Gi
+    storageClass: standard
+  resources: {}
+
+backend:
+  image: dso202-backend
+  replicaCount: 1
+  port: 8080
+  corsOrigin: "*"
+  resources: {}
+
+frontend:
+  image: dso202-frontend
+  replicaCount: 1
+  port: 8080
+  service:
+    type: NodePort
+    # Leave empty to let Kubernetes pick a free NodePort.
+    nodePort: ""
+  # URL the *browser* uses to call the backend (written into config.js).
+  # Empty means the in-cluster Service name, which only works inside the cluster.
+  backendUrl: ""
+  resources: {}
+
+quota:
+  enabled: true
+  hard:
+    pods: "6"
+    requests.cpu: "1500m"
+    requests.memory: 1Gi
+    limits.cpu: "3"
+    limits.memory: 2Gi
+
+limitRange:
+  enabled: true
+  defaultRequest:
+    cpu: 100m
+    memory: 128Mi
+  default:
+    cpu: 250m
+    memory: 256Mi
+  min:
+    cpu: 50m
+    memory: 64Mi
+  max:
+    cpu: 500m
+    memory: 512Mi

@@ -1,0 +1,10 @@
+# helm upgrade --install tasks ./dso202-tasks -n dso202-a3-helm-dev --create-namespace -f environments/dev.yaml
+environment: dev
+
+credentials:
+  password: ChangeMe123!
+
+frontend:
+  service:
+    nodePort: 30084
+  backendUrl: http://localhost:8081

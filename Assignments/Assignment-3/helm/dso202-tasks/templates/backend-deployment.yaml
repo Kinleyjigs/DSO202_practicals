@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dso202.backendName" . }}
+  labels:
+    {{- include "dso202.labels" . | nindent 4 }}
+    tier: backend
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "dso202.selectorLabels" (dict "root" . "tier" "backend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "dso202.labels" . | nindent 8 }}
+        tier: backend
+      annotations:
+        {{- include "dso202.checksums" . | nindent 8 }}
+    spec:
+      containers:
+        - name: backend
+          image: {{ include "dso202.image" (dict "root" . "name" .Values.backend.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.backend.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "dso202.configName" . }}
+            - secretRef:
+                name: {{ include "dso202.secretName" . }}
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: {{ .Values.backend.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- with .Values.backend.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

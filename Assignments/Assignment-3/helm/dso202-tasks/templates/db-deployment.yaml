@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dso202.dbName" . }}
+  labels:
+    {{- include "dso202.labels" . | nindent 4 }}
+    tier: database
+spec:
+  replicas: 1
+  # Recreate: the RWO volume can only be mounted by one Pod at a time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "dso202.selectorLabels" (dict "root" . "tier" "database") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "dso202.labels" . | nindent 8 }}
+        tier: database
+      annotations:
+        {{- include "dso202.checksums" . | nindent 8 }}
+    spec:
+      containers:
+        - name: db
+          image: {{ include "dso202.image" (dict "root" . "name" .Values.database.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.database.port }}
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "dso202.configName" . }}
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dso202.secretName" . }}
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dso202.secretName" . }}
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          {{- with .Values.database.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: db-storage
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: {{ include "dso202.dbName" . }}-pvc

@@ -1,0 +1,37 @@
+# base/kustomization.yaml - the shared ("boring") truth of the 3-tier app.
+# Base stores what is shared. Overlays store what is different.
+# No namespace here on purpose: each overlay chooses its own.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Compose
+resources:
+  - governance/quota.yaml
+  - database/pvc.yaml
+  - database/deployment.yaml
+  - database/service.yaml
+  - backend/deployment.yaml
+  - backend/service.yaml
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+
+# Cross-cutting label on every object and Pod template, but NOT on selectors
+# (selectors are immutable on Deployments).
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: dso202-tasks
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false
+    includeTemplates: true
+
+# Generated resources. Kustomize appends a content hash to each name and
+# rewrites every configMapKeyRef / secretKeyRef to the hashed name.
+configMapGenerator:
+  - name: dso202-config
+    envs:
+      - config/app.env
+
+secretGenerator:
+  - name: dso202-secret
+    envs:
+      - config/db-credentials.env

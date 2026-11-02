@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dso202.configName" . }}
+  labels:
+    {{- include "dso202.labels" . | nindent 4 }}
+data:
+  APP_ENV: {{ .Values.environment | quote }}
+  # Service names are templated, so they always match this release's objects.
+  DB_HOST: {{ include "dso202.dbName" . | quote }}
+  DB_PORT: {{ .Values.database.port | quote }}
+  DB_NAME: {{ .Values.database.name | quote }}
+  POSTGRES_DB: {{ .Values.database.name | quote }}
+  APP_PORT: {{ .Values.backend.port | quote }}
+  CORS_ORIGIN: {{ .Values.backend.corsOrigin | quote }}
+  BACKEND_URL: {{ .Values.frontend.backendUrl | default (printf "http://%s:%v" (include "dso202.backendName" .) .Values.backend.port) | quote }}

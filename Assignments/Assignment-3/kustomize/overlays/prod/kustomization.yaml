@@ -1,0 +1,66 @@
+# overlays/prod - production differences only.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+namespace: dso202-a3-kustomize-prod
+
+labels:
+  - pairs:
+      app.kubernetes.io/environment: prod
+    includeSelectors: false
+    includeTemplates: true
+
+# Purpose-built transformers
+replicas:
+  - name: backend-deployment
+    count: 2
+  - name: frontend-deployment
+    count: 2
+
+images:
+  - name: sarojsanyasi/dso202-backend
+    newTag: "1.0"
+  - name: sarojsanyasi/dso202-frontend
+    newTag: "1.0"
+  - name: sarojsanyasi/dso202-db
+    newTag: "1.0"
+
+# Generated resources: merge prod values into the ConfigMap, and give prod its
+# own credentials (replaces the base Secret).
+configMapGenerator:
+  - name: dso202-config
+    behavior: merge
+    literals:
+      - APP_ENV=prod
+      # Browser-facing URL (see dev overlay): a local port-forward of backend-svc.
+      - BACKEND_URL=http://localhost:8083
+
+secretGenerator:
+  - name: dso202-secret
+    behavior: replace
+    envs:
+      - prod-credentials.env
+
+patches:
+  # Strategic merge: Kubernetes-shaped fragments (resources, quota).
+  - path: patch-resources.yaml
+  - path: patch-quota.yaml
+  # JSON 6902: exact paths, including a key that contains "/" (escaped as ~1).
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: backend-deployment
+    path: patch-annotations-json6902.yaml
+  - target:
+      version: v1
+      kind: Service
+      name: frontend-svc
+    patch: |-
+      - op: add
+        path: /spec/ports/0/nodePort
+        value: 30083

@@ -1,0 +1,38 @@
+# overlays/dev - a thin overlay: only what differs for development.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Compose: the shared base plus this environment's Namespace.
+resources:
+  - ../../base
+  - namespace.yaml
+
+# Cross-cutting transforms
+namespace: dso202-a3-kustomize-dev
+
+labels:
+  - pairs:
+      app.kubernetes.io/environment: dev
+    includeSelectors: false
+    includeTemplates: true
+
+# Generated resources: merge dev-only values into the base ConfigMap.
+# BACKEND_URL is used by the browser (config.js), not by nginx, so in dev it
+# points at a local port-forward of backend-svc instead of the in-cluster DNS name.
+configMapGenerator:
+  - name: dso202-config
+    behavior: merge
+    literals:
+      - APP_ENV=dev
+      - BACKEND_URL=http://localhost:8081
+
+# Precise customisation: an inline JSON 6902 patch for the dev NodePort.
+patches:
+  - target:
+      version: v1
+      kind: Service
+      name: frontend-svc
+    patch: |-
+      - op: add
+        path: /spec/ports/0/nodePort
+        value: 30082

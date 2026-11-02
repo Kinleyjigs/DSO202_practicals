@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dso202.frontendName" . }}
+  labels:
+    {{- include "dso202.labels" . | nindent 4 }}
+    tier: frontend
+spec:
+  type: {{ .Values.frontend.service.type }}
+  selector:
+    {{- include "dso202.selectorLabels" (dict "root" . "tier" "frontend") | nindent 4 }}
+  ports:
+    - port: {{ .Values.frontend.port }}
+      targetPort: {{ .Values.frontend.port }}
+      {{- if and (eq .Values.frontend.service.type "NodePort") .Values.frontend.service.nodePort }}
+      nodePort: {{ .Values.frontend.service.nodePort }}
+      {{- end }}
